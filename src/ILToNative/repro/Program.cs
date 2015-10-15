@@ -1,13 +1,36 @@
-﻿// Copyright (c) Microsoft. All rights reserved.
-// Licensed under the MIT license. See LICENSE file in the project root for full license information.
+﻿using System;
+using System.Buffers;
+using System.Net.Libuv;
+using System.Text;
+using System.Text.Utf8;
 
-using System;
-
-internal class Program
+class Program
 {
-    private static void Main(string[] args)
+    static void Main(string[] args)
     {
-        Console.WriteLine("Hello world");
+        byte[] buffer = new byte[1024];
+        Utf8String quote = new Utf8String("Insanity: doing the same thing over and over again and expecting different results. - Albert Einstein\r\n"); ;
+
+        var loop = new UVLoop();
+
+        var listener = new TcpListener("0.0.0.0", 17, loop);
+
+        listener.ConnectionAccepted += (Tcp connection) =>
+        {
+            connection.ReadCompleted += (ByteSpan data) =>
+            {
+#if ECHO
+                connection.TryWrite(data);
+#else
+                quote.CopyTo(buffer);
+                connection.TryWrite(buffer, quote.Length);
+#endif
+            };
+
+            connection.ReadStart();
+        };
+
+        listener.Listen();
+        loop.Run();
     }
 }
-

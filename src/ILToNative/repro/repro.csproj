@@ -42,5 +42,16 @@
   <ItemGroup>
     <None Include="project.json" />
   </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Buffers">
+      <HintPath>..\..\..\..\corefxlab\bin\Windows_NT.AnyCPU.Debug\System.Buffers\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Libuv">
+      <HintPath>..\..\..\..\corefxlab\bin\Windows_NT.AnyCPU.Debug\System.Net.Libuv\System.Net.Libuv.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Utf8">
+      <HintPath>..\..\..\..\corefxlab\bin\Windows_NT.AnyCPU.Debug\System.Text.Utf8\System.Text.Utf8.dll</HintPath>
+    </Reference>
+  </ItemGroup>
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), dir.targets))\dir.targets" />
 </Project>
