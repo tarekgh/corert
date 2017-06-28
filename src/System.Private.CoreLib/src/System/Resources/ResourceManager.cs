@@ -283,12 +283,10 @@ namespace System.Resources
 
             SetAppXConfiguration();
 
-            if (_bUsingModernResourceManagement == false)
-            {
-                _lastUsedResourceCache = new CultureNameResourceSetPair();
-                ResourceManagerMediator mediator = new ResourceManagerMediator(this);
-                resourceGroveler = new ManifestBasedResourceGroveler(mediator);
-            }
+            // Now we can use the managed resources even when using PRI's to support the APIs GetObject, GetStream...etc.
+            _lastUsedResourceCache = new CultureNameResourceSetPair();
+            ResourceManagerMediator mediator = new ResourceManagerMediator(this);
+            resourceGroveler = new ManifestBasedResourceGroveler(mediator);
         }
 
         // Constructs a Resource Manager for files beginning with 
@@ -413,18 +411,16 @@ namespace System.Resources
         // security check in each constructor prevents it.
         private void CommonAssemblyInit()
         {
-            if (_bUsingModernResourceManagement == false)
-            {
-                UseManifest = true;
+            // Now we can use the managed resources even when using PRI's to support the APIs GetObject, GetStream...etc.
+            UseManifest = true;
 
-                _resourceSets = new Dictionary<String, ResourceSet>();
-                _lastUsedResourceCache = new CultureNameResourceSetPair();
+            _resourceSets = new Dictionary<String, ResourceSet>();
+            _lastUsedResourceCache = new CultureNameResourceSetPair();
 
-                _fallbackLoc = UltimateResourceFallbackLocation.MainAssembly;
+            _fallbackLoc = UltimateResourceFallbackLocation.MainAssembly;
 
-                ResourceManagerMediator mediator = new ResourceManagerMediator(this);
-                resourceGroveler = new ManifestBasedResourceGroveler(mediator);
-            }
+            ResourceManagerMediator mediator = new ResourceManagerMediator(this);
+            resourceGroveler = new ManifestBasedResourceGroveler(mediator);
 
             _neutralResourcesCulture = ManifestBasedResourceGroveler.GetNeutralResourcesLanguage(MainAssembly, ref _fallbackLoc);
         }
@@ -434,14 +430,7 @@ namespace System.Resources
         {
             get
             {
-                if (_bUsingModernResourceManagement)
-                {
-                    throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedProperty, nameof(BaseName)));
-                }
-                else
-                {
-                    return BaseNameField;
-                }
+                return BaseNameField;
             }
         }
 
@@ -449,27 +438,16 @@ namespace System.Resources
         // GetString or GetObject.
         public virtual bool IgnoreCase
         {
-            get
-            {
-                if (_bUsingModernResourceManagement)
-                {
-                    return false;
-                }
-                else
-                {
-                    return _ignoreCase;
-                }
-            }
-            set
-            {
-                if (_bUsingModernResourceManagement)
+            get { return _ignoreCase; }
+            set 
+            { 
+#if FEATURE_APPX
+                if (_PRIonAppXInitialized && value)
                 {
                     throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedProperty, nameof(IgnoreCase)));
                 }
-                else
-                {
-                    _ignoreCase = value;
-                }
+#endif // FEATURE_APPX
+                _ignoreCase = value; 
             }
         }
 
@@ -479,14 +457,7 @@ namespace System.Resources
         {
             get
             {
-                if (_bUsingModernResourceManagement)
-                {
-                    throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedProperty, nameof(ResourceSetType)));
-                }
-                else
-                {
-                    return (_userResourceSet == null) ? typeof(RuntimeResourceSet) : _userResourceSet;
-                }
+                return (_userResourceSet == null) ? typeof(RuntimeResourceSet) : _userResourceSet;
             }
         }
 
@@ -494,25 +465,11 @@ namespace System.Resources
         {
             get
             {
-                if (_bUsingModernResourceManagement)
-                {
-                    throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedProperty, nameof(FallbackLocation)));
-                }
-                else
-                {
-                    return _fallbackLoc;
-                }
+                return _fallbackLoc;
             }
             set
             {
-                if (_bUsingModernResourceManagement)
-                {
-                    throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedProperty, nameof(FallbackLocation)));
-                }
-                else
-                {
-                    _fallbackLoc = value;
-                }
+                _fallbackLoc = value;
             }
         }
 
@@ -562,9 +519,6 @@ namespace System.Resources
         // such as ".ResX", or a completely different format for naming files.
         protected virtual String GetResourceFileName(CultureInfo culture)
         {
-            if (_bUsingModernResourceManagement)
-                throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedMethod, nameof(GetResourceFileName)));
-
             StringBuilder sb = new StringBuilder(255);
             sb.Append(BaseNameField);
             // If this is the neutral culture, don't append culture name.
@@ -649,9 +603,6 @@ namespace System.Resources
         //         
         public virtual ResourceSet GetResourceSet(CultureInfo culture, bool createIfNotExists, bool tryParents)
         {
-            if (_bUsingModernResourceManagement)
-                throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedMethod, nameof(GetResourceSet)));
-
             if (null == culture)
                 throw new ArgumentNullException(nameof(culture));
 
@@ -687,9 +638,6 @@ namespace System.Resources
         // This will take a minimal number of locks.
         protected virtual ResourceSet InternalGetResourceSet(CultureInfo culture, bool createIfNotExists, bool tryParents)
         {
-            if (_bUsingModernResourceManagement)
-                throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedMethod, nameof(InternalGetResourceSet)));
-
             Dictionary<String, ResourceSet> localResourceSets = _resourceSets;
             ResourceSet rs = null;
             CultureInfo foundCulture = null;
@@ -941,19 +889,12 @@ namespace System.Resources
         [NonSerialized]
         private PRIExceptionInfo _PRIExceptionInfo; // Written only by SetAppXConfiguration
 
-        // When running under AppX, the toolchain stamped assemblies with embedded resources
-        // with HasEmbeddedStringResourcesAttribute
+        // Using coreclr implementation
+        // We may try having ShouldUseSatelliteAssemblyResourceLookupUnderAppX always return false if the corelib resources
+        // can be reached through the PRI resource lookup. at that time we can get rid of _bUsingModernResourceManagement too.
         private bool ShouldUseSatelliteAssemblyResourceLookupUnderAppX(Assembly resourcesAssembly)
         {
-            foreach (CustomAttributeData attrData in resourcesAssembly.CustomAttributes)
-            {
-                if (attrData.AttributeType.Equals(typeof(HasEmbeddedStringResourcesAttribute)))
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return typeof(Object).Assembly == resourcesAssembly;
         }
 
 #endif // FEATURE_APPX
@@ -1208,9 +1149,6 @@ namespace System.Resources
         // 
         public virtual Object GetObject(String name)
         {
-            if (_bUsingModernResourceManagement)
-                throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedMethod, nameof(GetObject)));
-
             return GetObject(name, (CultureInfo)null, true);
         }
 
@@ -1219,9 +1157,6 @@ namespace System.Resources
         // Returns null if the resource wasn't found.
         public virtual Object GetObject(String name, CultureInfo culture)
         {
-            if (_bUsingModernResourceManagement)
-                throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedMethod, nameof(GetObject)));
-
             return GetObject(name, culture, true);
         }
 
@@ -1308,17 +1243,11 @@ namespace System.Resources
 
         public UnmanagedMemoryStream GetStream(String name)
         {
-            if (_bUsingModernResourceManagement)
-                throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedMethod, nameof(GetStream)));
-
             return GetStream(name, (CultureInfo)null);
         }
 
         public UnmanagedMemoryStream GetStream(String name, CultureInfo culture)
         {
-            if (_bUsingModernResourceManagement)
-                throw new PlatformNotSupportedException(SR.Format(SR.PlatformNotSupported_ResourceManager_ResWFileUnsupportedMethod, nameof(GetStream)));
-
             Object obj = GetObject(name, culture, false);
             UnmanagedMemoryStream ums = obj as UnmanagedMemoryStream;
             if (ums == null && obj != null)
